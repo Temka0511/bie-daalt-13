@@ -1,0 +1,171 @@
+<!DOCTYPE html>
+<html lang="mn">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Task Tracker</title>
+  <style>
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body { font-family: Arial, sans-serif; background: #f0f2f5; padding: 20px; }
+    h1 { text-align: center; margin-bottom: 20px; color: #333; }
+
+    .container { max-width: 800px; margin: 0 auto; }
+
+    .form-card {
+      background: white; padding: 20px; border-radius: 8px;
+      box-shadow: 0 2px 8px rgba(0,0,0,0.1); margin-bottom: 20px;
+    }
+    .form-card input, .form-card select {
+      width: 100%; padding: 8px; margin: 6px 0 12px;
+      border: 1px solid #ddd; border-radius: 4px; font-size: 14px;
+    }
+    .form-card button {
+      background: #4CAF50; color: white; border: none;
+      padding: 10px 20px; border-radius: 4px; cursor: pointer; font-size: 14px;
+    }
+    .form-card button:hover { background: #45a049; }
+
+    .filters { display: flex; gap: 10px; margin-bottom: 16px; }
+    .filters input, .filters select {
+      padding: 8px; border: 1px solid #ddd;
+      border-radius: 4px; font-size: 14px; flex: 1;
+    }
+
+    .task-card {
+      background: white; padding: 16px; border-radius: 8px;
+      box-shadow: 0 2px 8px rgba(0,0,0,0.1); margin-bottom: 10px;
+      display: flex; justify-content: space-between; align-items: center;
+    }
+    .task-card.completed { opacity: 0.6; text-decoration: line-through; }
+    .task-info h3 { font-size: 16px; color: #333; }
+    .task-info span { font-size: 12px; color: #888; margin-right: 8px; }
+    .badge {
+      display: inline-block; padding: 2px 8px; border-radius: 12px;
+      font-size: 11px; font-weight: bold;
+    }
+    .high { background: #ffe0e0; color: #c00; }
+    .medium { background: #fff3cd; color: #856404; }
+    .low { background: #d4edda; color: #155724; }
+
+    .task-actions button {
+      border: none; padding: 6px 12px; border-radius: 4px;
+      cursor: pointer; font-size: 12px; margin-left: 6px;
+    }
+    .btn-complete { background: #4CAF50; color: white; }
+    .btn-delete { background: #f44336; color: white; }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <h1>📋 Task Tracker</h1>
+
+    <div class="form-card">
+      <h3>Шинэ даалгавар нэмэх</h3>
+      <input type="text" id="title" placeholder="Гарчиг *" required>
+      <input type="text" id="description" placeholder="Тайлбар">
+      <input type="date" id="due_date">
+      <select id="priority">
+        <option value="medium">Дунд</option>
+        <option value="high">Өндөр</option>
+        <option value="low">Бага</option>
+      </select>
+      <input type="text" id="label" placeholder="Label (жш: сургууль, ажил)">
+      <button onclick="createTask()">➕ Нэмэх</button>
+    </div>
+
+    <div class="filters">
+      <input type="text" id="search" placeholder="🔍 Хайх..." oninput="loadTasks()">
+      <select id="filterPriority" onchange="loadTasks()">
+        <option value="">Бүх priority</option>
+        <option value="high">Өндөр</option>
+        <option value="medium">Дунд</option>
+        <option value="low">Бага</option>
+      </select>
+    </div>
+
+    <div id="taskList"></div>
+  </div>
+
+  <script>
+    const API = 'http://localhost:3000/api/tasks';
+
+    async function loadTasks() {
+      const search = document.getElementById('search').value;
+      const priority = document.getElementById('filterPriority').value;
+      let url = API + '?';
+      if (search) url += `search=${search}&`;
+      if (priority) url += `priority=${priority}`;
+
+      const res = await fetch(url);
+      const tasks = await res.json();
+      renderTasks(tasks);
+    }
+
+    function renderTasks(tasks) {
+      const list = document.getElementById('taskList');
+      if (tasks.length === 0) {
+        list.innerHTML = '<p style="text-align:center;color:#888">Даалгавар байхгүй</p>';
+        return;
+      }
+      list.innerHTML = tasks.map(t => `
+        <div class="task-card ${t.completed ? 'completed' : ''}">
+          <div class="task-info">
+            <h3>${t.title}</h3>
+            <span class="badge ${t.priority}">${t.priority}</span>
+            ${t.label ? `<span class="badge" style="background:#e8f4fd;color:#0066cc">${t.label}</span>` : ''}
+            ${t.due_date ? `<span>📅 ${t.due_date}</span>` : ''}
+            ${t.description ? `<p style="font-size:13px;color:#666;margin-top:4px">${t.description}</p>` : ''}
+          </div>
+          <div class="task-actions">
+            <button class="btn-complete" onclick="toggleComplete(${t.id}, ${t.completed})">
+              ${t.completed ? '↩️' : '✅'}
+            </button>
+            <button class="btn-delete" onclick="deleteTask(${t.id})">🗑️</button>
+          </div>
+        </div>
+      `).join('');
+    }
+
+    async function createTask() {
+      const title = document.getElementById('title').value.trim();
+      if (!title) return alert('Гарчиг оруулна уу!');
+
+      await fetch(API, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          title,
+          description: document.getElementById('description').value,
+          due_date: document.getElementById('due_date').value,
+          priority: document.getElementById('priority').value,
+          label: document.getElementById('label').value
+        })
+      });
+
+      document.getElementById('title').value = '';
+      document.getElementById('description').value = '';
+      document.getElementById('due_date').value = '';
+      document.getElementById('label').value = '';
+      loadTasks();
+    }
+
+    async function toggleComplete(id, completed) {
+      const task = await (await fetch(`${API}/${id}`)).json();
+      await fetch(`${API}/${id}`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ ...task, completed: completed ? 0 : 1 })
+      });
+      loadTasks();
+    }
+
+    async function deleteTask(id) {
+      if (!confirm('Устгах уу?')) return;
+      await fetch(`${API}/${id}`, { method: 'DELETE' });
+      loadTasks();
+    }
+
+    loadTasks();
+  </script>
+</body>
+</html>
